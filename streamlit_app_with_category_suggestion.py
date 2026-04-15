@@ -37,32 +37,32 @@ def read_excel_safely(uploaded_file, sheet_name):
         ) from e
 
 CATEGORY_RULES = [
-    ('023', ['resistor network', 'ressip', 'res network', 'array resistor']),
-    ('024', ['rc network']),
-    ('022', ['resistor']),
-    ('021', ['capacitor', 'cap']),
-    ('025', ['led', 'lcd', 'optical']),
-    ('026', ['xcvr', 'rcvr', 'transceiver', 'receiver module']),
-    ('027', ['analog ic', 'op amp', 'adc', 'dac', 'comparator', 'regulator']),
-    ('029', ['digital ic', 'logic', 'buffer', 'flip-flop', 'mux', 'demux', 'gate']),
-    ('030', ['eprom', 'eeprom', 'flash', 'fpga', 'mcu', 'microcontroller', 'cpu', 'special ic', 'hybrid', 'gate array']),
-    ('031', ['ptc']),
-    ('032', ['pal', 'prom', 'programmed device', 'memory']),
-    ('033', ['delayline', 'delay line']),
-    ('034', ['crystal', 'oscillator']),
-    ('035', ['diode', 'transistor', 'rectifier', 'varistor', 'mosfet', 'xstr', 'zener']),
-    ('036', ['thermistor']),
-    ('037', ['inductor', 'ferrite', 'choke', 'tvs', 'filter', 'transformer', 'xfmr', 'bead']),
-    ('038', ['fuse', 'circuit breaker', 'holder']),
-    ('039', ['relay']),
-    ('041', ['switch']),
-    ('043', ['header', 'receptacle', 'shunt', 'pin']),
-    ('044', ['connector', 'socket', 'adapter', 'terminal', 'term']),
-    ('045', ['screw', 'nut', 'washer', 'fastener', 'insul', 'insulator', 'standoff']),
-    ('046', ['cable', 'wire', 'cord']),
-    ('047', ['hardware', 'chassis', 'bracket', 'guard', 'cover', 'mounting', 'panel', 'plate', 'guide', 'lock', 'emi']),
-    ('048', ['power supply', 'pwrsply', 'fan', 'battery']),
-    ('049', ['heatsink', 'heat sink']),
+    ("023", ["resistor network", "res network", "ressip", "array resistor", "res net"]),
+    ("024", ["rc network"]),
+    ("022", ["resistor", "res,", "res "]),
+    ("021", ["capacitor", "cap,", "cap "]),
+    ("025", ["led", "lcd", "optical"]),
+    ("026", ["xcvr", "rcvr", "transceiver", "receiver module"]),
+    ("027", ["analog ic", "op amp", "adc", "dac", "comparator", "regulator"]),
+    ("029", ["digital ic", "logic", "buffer", "flip-flop", "mux", "demux", "gate"]),
+    ("030", ["eprom", "eeprom", "flash", "fpga", "mcu", "microcontroller", "cpu", "special ic", "hybrid", "gate array"]),
+    ("031", ["ptc"]),
+    ("032", ["pal", "prom", "programmed device", "memory"]),
+    ("033", ["delayline", "delay line"]),
+    ("034", ["crystal", "oscillator"]),
+    ("035", ["diode", "transistor", "rectifier", "varistor", "mosfet", "xstr", "zener"]),
+    ("036", ["thermistor"]),
+    ("037", ["inductor", "ind,", "ind ", "ferrite", "choke", "tvs", "filter", "transformer", "xfmr", "bead"]),
+    ("038", ["fuse", "circuit breaker", "holder"]),
+    ("039", ["relay"]),
+    ("041", ["switch"]),
+    ("043", ["header", "receptacle", "shunt", "pin"]),
+    ("044", ["connector", "conn", "socket", "adapter", "terminal", "term"]),
+    ("045", ["screw", "nut", "washer", "fastener", "insul", "insulator", "standoff"]),
+    ("046", ["cable", "wire", "cord"]),
+    ("047", ["hardware", "chassis", "bracket", "guard", "cover", "mounting", "panel", "plate", "guide", "lock", "emi"]),
+    ("048", ["power supply", "pwrsply", "fan", "battery"]),
+    ("049", ["heatsink", "heat sink"]),
 ]
 
 CATEGORY_DESCRIPTION = {
@@ -95,43 +95,70 @@ CATEGORY_DESCRIPTION = {
 }
 
 def suggest_part_number_category(description, location, bom_mpn_list):
-    text = ' '.join([
-        normalize_text(description),
-        normalize_text(location),
-        normalize_text(bom_mpn_list),
-    ]).lower()
+    desc = normalize_text(description).lower()
+    loc = normalize_text(location).upper()
+    mpn_text = normalize_text(bom_mpn_list).lower()
 
+    text = " ".join([desc, normalize_text(location).lower(), mpn_text])
+
+    # ----------------------------
+    # Priority 1: common BOM abbreviations in description
+    # ----------------------------
+    if desc.startswith("res") or " res," in f" {desc}" or "resistor" in desc:
+        return "022", CATEGORY_DESCRIPTION["022"], "Description suggests resistor"
+
+    if desc.startswith("cap") or " cap," in f" {desc}" or "capacitor" in desc:
+        return "021", CATEGORY_DESCRIPTION["021"], "Description suggests capacitor"
+
+    if desc.startswith("ind") or " ind," in f" {desc}" or "inductor" in desc:
+        return "037", CATEGORY_DESCRIPTION["037"], "Description suggests inductor/filter"
+
+    if desc.startswith("conn") or " conn" in f" {desc}" or "connector" in desc:
+        return "044", CATEGORY_DESCRIPTION["044"], "Description suggests connector"
+
+    if "resistor network" in desc or "ressip" in desc or desc.startswith("rn"):
+        return "023", CATEGORY_DESCRIPTION["023"], "Description suggests resistor network"
+
+    if "rc network" in desc:
+        return "024", CATEGORY_DESCRIPTION["024"], "Description suggests RC network"
+
+    # ----------------------------
+    # Priority 2: location / refdes
+    # ----------------------------
+    if loc.startswith("RN") or loc.startswith("RA"):
+        return "023", CATEGORY_DESCRIPTION["023"], "Location prefix suggests resistor network"
+    if loc.startswith("R"):
+        return "022", CATEGORY_DESCRIPTION["022"], "Location prefix suggests resistor"
+    if loc.startswith("C"):
+        return "021", CATEGORY_DESCRIPTION["021"], "Location prefix suggests capacitor"
+    if loc.startswith("L") or loc.startswith("FB") or loc.startswith("T"):
+        return "037", CATEGORY_DESCRIPTION["037"], "Location prefix suggests inductor/filter"
+    if loc.startswith("D") or loc.startswith("Q") or loc.startswith("CR"):
+        return "035", CATEGORY_DESCRIPTION["035"], "Location prefix suggests discrete semiconductor"
+    if loc.startswith("F"):
+        return "038", CATEGORY_DESCRIPTION["038"], "Location prefix suggests fuse"
+    if loc.startswith("K"):
+        return "039", CATEGORY_DESCRIPTION["039"], "Location prefix suggests relay"
+    if loc.startswith("J") or loc.startswith("P") or loc.startswith("CN"):
+        return "044", CATEGORY_DESCRIPTION["044"], "Location prefix suggests connector"
+    if loc.startswith("H"):
+        return "043", CATEGORY_DESCRIPTION["043"], "Location prefix suggests header/pin"
+    if loc.startswith("U") or loc.startswith("IC"):
+        return "030", CATEGORY_DESCRIPTION["030"], "Location prefix suggests IC"
+    if loc.startswith("Y") or loc.startswith("X"):
+        return "034", CATEGORY_DESCRIPTION["034"], "Location prefix suggests crystal/oscillator"
+    if loc.startswith("SW") or loc.startswith("S"):
+        return "041", CATEGORY_DESCRIPTION["041"], "Location prefix suggests switch"
+
+    # ----------------------------
+    # Priority 3: general keyword scan
+    # ----------------------------
     for code, keywords in CATEGORY_RULES:
         for kw in keywords:
             if kw in text:
-                return code, CATEGORY_DESCRIPTION.get(code, ''), f'Keyword match: {kw}'
+                return code, CATEGORY_DESCRIPTION.get(code, ""), f"Keyword match: {kw}"
 
-    loc = normalize_text(location).upper()
-    if loc.startswith('RN') or loc.startswith('RA'):
-        return '023', CATEGORY_DESCRIPTION['023'], 'Location prefix suggests resistor network'
-    if loc.startswith('R'):
-        return '022', CATEGORY_DESCRIPTION['022'], 'Location prefix suggests resistor'
-    if loc.startswith('C'):
-        return '021', CATEGORY_DESCRIPTION['021'], 'Location prefix suggests capacitor'
-    if loc.startswith('L') or loc.startswith('FB') or loc.startswith('T'):
-        return '037', CATEGORY_DESCRIPTION['037'], 'Location prefix suggests inductor/filter'
-    if loc.startswith('D') or loc.startswith('Q') or loc.startswith('CR'):
-        return '035', CATEGORY_DESCRIPTION['035'], 'Location prefix suggests discrete semiconductor'
-    if loc.startswith('F'):
-        return '038', CATEGORY_DESCRIPTION['038'], 'Location prefix suggests fuse'
-    if loc.startswith('K'):
-        return '039', CATEGORY_DESCRIPTION['039'], 'Location prefix suggests relay'
-    if loc.startswith('J') or loc.startswith('P') or loc.startswith('CN'):
-        return '044', CATEGORY_DESCRIPTION['044'], 'Location prefix suggests connector'
-    if loc.startswith('H'):
-        return '043', CATEGORY_DESCRIPTION['043'], 'Location prefix suggests header/pin'
-    if loc.startswith('U') or loc.startswith('IC'):
-        return '030', CATEGORY_DESCRIPTION['030'], 'Location prefix suggests IC'
-    if loc.startswith('Y') or loc.startswith('X'):
-        return '034', CATEGORY_DESCRIPTION['034'], 'Location prefix suggests crystal/oscillator'
-    if loc.startswith('SW') or loc.startswith('S'):
-        return '041', CATEGORY_DESCRIPTION['041'], 'Location prefix suggests switch'
-    return '', 'Needs Review', 'Unable to classify from description/location/MPN'
+    return "", "Needs Review", "Unable to classify from description/location/MPN"
 
 def extract_bom_mpn_pairs(row_values: List[str]) -> List[Tuple[str, str, str]]:
     pairs = []
