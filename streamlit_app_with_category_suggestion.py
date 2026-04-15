@@ -66,32 +66,34 @@ CATEGORY_RULES = [
 ]
 
 CATEGORY_DESCRIPTION = {
-    '021': 'CAPACITOR',
-    '022': 'RESISTOR',
-    '023': 'RESISTOR NETWORK, RESSIP',
-    '024': 'RC NETWORK',
-    '025': 'OPTICAL COMPONENT, LED, LCD',
-    '026': 'ELECTRONIC MODULE, XCVR, RCVR',
-    '027': 'IC, ANALOG',
-    '029': 'IC, DIGITAL STANDARD',
-    '030': 'IC, OTHER / SPECIAL, HYBRID, EPROM, EPROM SET, GATE ARRAY',
-    '031': 'PTC',
-    '032': 'MEM, PROG DEVICE, PAL, PROM',
-    '033': 'DELAYLINE',
-    '034': 'CRYSTAL, OSCILLATOR',
-    '035': 'DISCRETE SEMI, DIODE, XSTR, RCTFR, VARISTOR',
-    '036': 'THERMISTORS',
-    '037': 'FILTER, INDUCTOR, FERRITE, XFMR, TVS, CHOKE',
-    '038': 'FUSE, CIRCUIT BREAKER, HOLDER',
-    '039': 'RELAY',
-    '041': 'SWITCH',
-    '043': 'HEADER, RECEPTACLE, SHUNT, PIN',
-    '044': 'CONNECTOR, SOCKET, ADAPTER, TERM',
-    '045': 'SCREW, NUT, FASTENER, WASHER, INSUL',
-    '046': 'CABLE, WIRE, CORD',
-    '047': 'HARDWARE, CHASSIS, BRACKET, GUARD, COVER, MOUNTING EARS, PANEL, PLATE, GUIDE, LOCK, EMI',
-    '048': 'PWRSPLY, FAN, BAT',
-    '049': 'HEATSINK MODULE',
+    "015": "PCB FAB",
+    "021": "CAPACITOR",
+    "022": "RESISTOR",
+    "023": "RESISTOR NETWORK, RESSIP",
+    "024": "RC NETWORK",
+    "025": "OPTICAL COMPONENT, LED, LCD",
+    "026": "ELECTRONIC MODULE, XCVR, RCVR",
+    "027": "IC, ANALOG",
+    "029": "IC, DIGITAL STANDARD",
+    "030": "IC, OTHER / SPECIAL, HYBRID, EPROM, EPROM SET, GATE ARRAY",
+    "031": "PTC",
+    "032": "MEM, PROG DEVICE, PAL, PROM",
+    "033": "DELAYLINE",
+    "034": "CRYSTAL, OSCILLATOR",
+    "035": "DISCRETE SEMI, DIODE, XSTR, RCTFR, VARISTOR",
+    "036": "THERMISTORS",
+    "037": "FILTER, INDUCTOR, FERRITE, XFMR, TVS, CHOKE",
+    "038": "FUSE, CIRCUIT BREAKER, HOLDER",
+    "039": "RELAY",
+    "041": "SWITCH",
+    "043": "HEADER, RECEPTACLE, SHUNT, PIN",
+    "044": "CONNECTOR, SOCKET, ADAPTER, TERM",
+    "045": "SCREW, NUT, FASTENER, WASHER, INSUL",
+    "046": "CABLE, WIRE, CORD",
+    "047": "HARDWARE, CHASSIS, BRACKET, GUARD, COVER, MOUNTING EARS, PANEL, PLATE, GUIDE, LOCK, EMI",
+    "048": "PWRSPLY, FAN, BAT",
+    "049": "HEATSINK MODULE",
+    "051": "ASSY PRODUCTION SUPPLY, COMPOUND, LOCTITE GLUE, KAPTON TAPE",
 }
 
 def suggest_part_number_category(description, location, bom_mpn_list):
@@ -100,6 +102,31 @@ def suggest_part_number_category(description, location, bom_mpn_list):
     mpn_text = normalize_text(bom_mpn_list).lower()
 
     text = " ".join([desc, normalize_text(location).lower(), mpn_text])
+
+    # ----------------------------
+    # Priority 0: very specific / must-win rules
+    # ----------------------------
+    if (
+        "underfill" in text
+        or "glue" in text
+        or "adhesive" in text
+        or "epoxy" in text
+        or "loctite" in text
+        or "kapton" in text
+        or "tape" in text
+        or "compound" in text
+    ):
+        return "051", CATEGORY_DESCRIPTION["051"], "Description/MPN suggests glue/underfill/compound"
+
+    if (
+        desc == "pcb"
+        or desc.startswith("pcb")
+        or " pcb" in f" {desc}"
+        or loc.startswith("PCB")
+        or "bare board" in text
+        or "printed circuit board" in text
+    ):
+        return "015", CATEGORY_DESCRIPTION["015"], "Description/location suggests PCB"
 
     # ----------------------------
     # Priority 1: common BOM abbreviations in description
@@ -160,22 +187,7 @@ def suggest_part_number_category(description, location, bom_mpn_list):
 
     return "", "Needs Review", "Unable to classify from description/location/MPN"
 
-def extract_bom_mpn_pairs(row_values: List[str]) -> List[Tuple[str, str, str]]:
-    pairs = []
-    primary_mfg = normalize_text(row_values[4]) if len(row_values) > 4 else ''
-    primary_mpn = normalize_text(row_values[5]) if len(row_values) > 5 else ''
-    if primary_mfg or primary_mpn:
-        pairs.append((primary_mfg, primary_mpn, 'Primary'))
 
-    alt_values = row_values[6:] if len(row_values) > 6 else []
-    alt_index = 1
-    for i in range(0, len(alt_values), 2):
-        alt_mfg = normalize_text(alt_values[i]) if i < len(alt_values) else ''
-        alt_mpn = normalize_text(alt_values[i + 1]) if i + 1 < len(alt_values) else ''
-        if alt_mfg or alt_mpn:
-            pairs.append((alt_mfg, alt_mpn, f'Alt {alt_index}'))
-            alt_index += 1
-    return pairs
 
 def read_original_bom(uploaded_file, sheet_name='BOM', data_start_row=2):
     uploaded_file.seek(0)
