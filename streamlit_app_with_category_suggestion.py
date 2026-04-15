@@ -187,6 +187,24 @@ def suggest_part_number_category(description, location, bom_mpn_list):
 
     return "", "Needs Review", "Unable to classify from description/location/MPN"
 
+def extract_bom_mpn_pairs(row_values: List[str]) -> List[Tuple[str, str, str]]:
+    pairs = []
+    primary_mfg = normalize_text(row_values[4]) if len(row_values) > 4 else ''
+    primary_mpn = normalize_text(row_values[5]) if len(row_values) > 5 else ''
+    if primary_mfg or primary_mpn:
+        pairs.append((primary_mfg, primary_mpn, 'Primary'))
+
+    alt_values = row_values[6:] if len(row_values) > 6 else []
+    alt_index = 1
+    for i in range(0, len(alt_values), 2):
+        alt_mfg = normalize_text(alt_values[i]) if i < len(alt_values) else ''
+        alt_mpn = normalize_text(alt_values[i + 1]) if i + 1 < len(alt_values) else ''
+        if alt_mfg or alt_mpn:
+            pairs.append((alt_mfg, alt_mpn, f'Alt {alt_index}'))
+            alt_index += 1
+    return pairs
+
+
 
 
 def read_original_bom(uploaded_file, sheet_name='BOM', data_start_row=2):
